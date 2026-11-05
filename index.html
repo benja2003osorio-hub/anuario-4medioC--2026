@@ -13,6 +13,8 @@
     }
     body {
       background-color: #121212;
+      /* Fondo con textura sutil de mesa de estudio */
+      background-image: radial-gradient(circle at 50% 40%, #1e1e1e 0%, #0d0d0d 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -21,21 +23,38 @@
       font-family: system-ui, -apple-system, sans-serif;
       overflow-x: hidden;
     }
+
     .flip-container {
       width: 100%;
       max-width: 1200px;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px 10px;
+      padding: 30px 15px;
+      position: relative;
     }
+
+    /* Simulación del lomo y grosor de hojas traseras */
     #book {
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      position: relative;
+      /* Sombra ambiental profunda + sombras laterales escalonadas que simulan el canto de las hojas */
+      box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.7),
+        -6px 0 0 -2px #e5e5e5,
+        -7px 0 0 -2px #999999,
+        -12px 2px 10px rgba(0, 0, 0, 0.4),
+        6px 0 0 -2px #e5e5e5,
+        7px 0 0 -2px #999999,
+        12px 2px 10px rgba(0, 0, 0, 0.4);
+      border-radius: 2px;
     }
+
     .page {
       background-color: #ffffff;
       overflow: hidden;
+      position: relative;
     }
+
     .page img {
       width: 100%;
       height: 100%;
@@ -43,10 +62,64 @@
       display: block;
       user-select: none;
     }
+
+    /* Sombra del pliegue / lomo interior (gutter shadow) */
+    /* Página izquierda: sombra en su borde derecho */
+    .page.--left::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 35px;
+      height: 100%;
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Página derecha: sombra en su borde izquierdo */
+    .page.--right::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 35px;
+      height: 100%;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Bisel exterior suave en el borde del papel */
+    .page.--left::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 10px;
+      height: 100%;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .page.--right::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 10px;
+      height: 100%;
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.06), transparent);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Controles de navegación */
     .controls {
       display: flex;
       gap: 16px;
-      margin-top: 15px;
+      margin-top: 20px;
       margin-bottom: 25px;
       align-items: center;
     }
@@ -54,11 +127,12 @@
       background-color: #ffffff18;
       color: #ffffff;
       border: 1px solid #ffffff35;
-      padding: 10px 20px;
+      padding: 10px 22px;
       border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 500;
+      backdrop-filter: blur(8px);
       transition: all 0.2s ease;
     }
     .btn:hover {
@@ -73,6 +147,7 @@
       font-size: 15px;
       min-width: 130px;
       text-align: center;
+      letter-spacing: 0.3px;
     }
   </style>
 </head>
@@ -92,21 +167,24 @@
     document.addEventListener('DOMContentLoaded', () => {
       const bookElement = document.getElementById('book');
       
-      // Lista con los nombres exactos de tus 34 archivos
+      // Orden exacto de las 36 páginas
       const imageFiles = [
         'Page_0.jpg',
-        ...Array.from({ length: 33 }, (_, i) => `Page_${String(i + 1).padStart(2, '0')}.jpg`)
+        'Page_0,5.jpg',
+        ...Array.from({ length: 32 }, (_, i) => `Page_${String(i + 1).padStart(2, '0')}.jpg`),
+        'Page_32,5.jpg',
+        'Page_33.jpg'
       ];
 
       const TOTAL_PAGES = imageFiles.length;
 
-      // Crear cada página en el libro
+      // Inyección dinámica de las páginas
       imageFiles.forEach((file, index) => {
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
 
         const img = document.createElement('img');
-        img.src = file; // Ruta directa en la misma carpeta
+        img.src = file;
         img.alt = `Página ${index + 1}`;
         
         if (index > 3) {
@@ -117,7 +195,7 @@
         bookElement.appendChild(pageDiv);
       });
 
-      // Inicialización de PageFlip
+      // Configuración de StPageFlip con sombras físicas realistas
       const pageFlip = new St.PageFlip(bookElement, {
         width: 550,
         height: 733,
@@ -126,8 +204,10 @@
         maxWidth: 1000,
         minHeight: 420,
         maxHeight: 1350,
-        maxShadowOpacity: 0.5,
+        maxShadowOpacity: 0.85,  // Sombras de curvatura dinámicas bien marcadas
         showCover: true,
+        drawShadow: true,
+        usePortrait: true,
         mobileScrollSupport: false
       });
 
