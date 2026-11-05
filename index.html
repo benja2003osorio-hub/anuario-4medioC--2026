@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anuario Digital</title>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #121212;
+      background-image: radial-gradient(circle at 50% 40%, #1e1e1e 0%, #0d0d0d 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+
+    .flip-container {
+      width: 100%;
+      max-width: 1300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px 15px;
+      position: relative;
+    }
+
+    #book {
+      position: relative;
+      border-radius: 2px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.55);
+      transition: box-shadow 0.3s ease;
+      transform: translateZ(0);
+    }
+
+    #book.is-open {
+      box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.7),
+        -6px 0 0 -2px #e5e5e5,
+        -7px 0 0 -2px #999999,
+        -12px 2px 10px rgba(0, 0, 0, 0.4),
+        6px 0 0 -2px #e5e5e5,
+        7px 0 0 -2px #999999,
+        12px 2px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Fondo 100% opaco y capas aisladas para que nunca se transparente la hoja de abajo */
+    .page {
+      background-color: #ffffff !important;
+      overflow: hidden;
+      position: relative;
+      -webkit-backface-visibility: hidden !important;
+      backface-visibility: hidden !important;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .page img {
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      display: block;
+      user-select: none;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      /* Renderizado nativo del navegador a máxima calidad */
+      image-rendering: auto;
+    }
+
+    /* Sombra del lomo central en páginas interiores */
+    .page.--left:not(:first-child):not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 30px;
+      height: 100%;
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.04) 60%, transparent 100%);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .page.--right:not(:first-child):not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 30px;
+      height: 100%;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.04) 60%, transparent 100%);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* Controles */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 15px;
+      margin-bottom: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn {
+      background-color: #ffffff18;
+      color: #ffffff;
+      border: 1px solid #ffffff35;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background-color: #ffffff35;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .page-info {
+      color: #cccccc;
+      font-size: 15px;
+      min-width: 130px;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="flip-container">
+    <div id="book"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="prevBtn">← Anterior</button>
+    <span class="page-info" id="pageNumber">Portada</span>
+    <button class="btn" id="nextBtn">Siguiente →</button>
+    <button class="btn" id="fullscreenBtn">⛶ Pantalla completa</button>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const bookElement = document.getElementById('book');
+      
+      const imageFiles = [
+        'Page_0.jpg',
+        'Page_0,5.jpg',
+        ...Array.from({ length: 32 }, (_, i) => `Page_${String(i + 1).padStart(2, '0')}.jpg`),
+        'Page_32,5.jpg',
+        'Page_33.jpg'
+      ];
+
+      const TOTAL_PAGES = imageFiles.length;
+
+      // Inyección directa de nodos HTML (mantiene el 100% de la calidad original del archivo)
+      imageFiles.forEach((file, index) => {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'page';
+
+        const img = document.createElement('img');
+        img.src = file;
+        img.alt = `Página ${index + 1}`;
+        // Prioridad alta y decodificación lista para evitar parpadeos
+        img.decoding = 'sync';
+        if (index < 6) {
+          img.fetchPriority = 'high';
+        }
+
+        pageDiv.appendChild(img);
+        bookElement.appendChild(pageDiv);
+      });
+
+      // Configuración en proporciones A4 exactas
+      const pageFlip = new St.PageFlip(bookElement, {
+        width: 500,
+        height: 707,
+        size: 'stretch',
+        minWidth: 310,
+        maxWidth: 1200,
+        minHeight: 438,
+        maxHeight: 1697,
+        maxShadowOpacity: 0.5,
+        showCover: true,
+        drawShadow: true,
+        usePortrait: true,
+        mobileScrollSupport: false,
+        flippingTime: 600
+      });
+
+      pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+      // Precarga agresiva de todas las imágenes en memoria del navegador
+      imageFiles.forEach(src => {
+        const imgPreload = new Image();
+        imgPreload.src = src;
+      });
+
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const pageInfo = document.getElementById('pageNumber');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+      prevBtn.addEventListener('click', () => pageFlip.flipPrev());
+      nextBtn.addEventListener('click', () => pageFlip.flipNext());
+
+      pageFlip.on('flip', (e) => {
+        const current = e.data;
+        if (current === 0) {
+          pageInfo.textContent = 'Portada';
+          bookElement.classList.remove('is-open');
+        } else if (current >= TOTAL_PAGES - 1) {
+          pageInfo.textContent = 'Contraportada';
+          bookElement.classList.remove('is-open');
+        } else {
+          pageInfo.textContent = `Páginas ${current} - ${current + 1} de ${TOTAL_PAGES}`;
+          bookElement.classList.add('is-open');
+        }
+      });
+
+      // Pantalla completa
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Error al activar pantalla completa: ${err.message}`);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+          fullscreenBtn.textContent = '✕ Salir de pantalla completa';
+        } else {
+          fullscreenBtn.textContent = '⛶ Pantalla completa';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
