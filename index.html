@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anuario Digital</title>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #121212;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+    .flip-container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px 10px;
+    }
+    #book {
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+    .page {
+      background-color: #ffffff;
+      overflow: hidden;
+    }
+    .page img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      user-select: none;
+    }
+    .controls {
+      display: flex;
+      gap: 16px;
+      margin-top: 15px;
+      margin-bottom: 25px;
+      align-items: center;
+    }
+    .btn {
+      background-color: #ffffff18;
+      color: #ffffff;
+      border: 1px solid #ffffff35;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background-color: #ffffff35;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .page-info {
+      color: #cccccc;
+      font-size: 15px;
+      min-width: 130px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="flip-container">
+    <div id="book"></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="prevBtn">← Anterior</button>
+    <span class="page-info" id="pageNumber">Portada</span>
+    <button class="btn" id="nextBtn">Siguiente →</button>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const TOTAL_PAGES = 36;
+      const bookElement = document.getElementById('book');
+
+      // Generación automática de las 36 páginas
+      for (let i = 1; i <= TOTAL_PAGES; i++) {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'page';
+
+        const img = document.createElement('img');
+        img.src = `paginas/page-${i}.jpg`;
+        img.alt = `Página ${i}`;
+        
+        // Carga inmediata de las primeras páginas, lazy loading para las siguientes
