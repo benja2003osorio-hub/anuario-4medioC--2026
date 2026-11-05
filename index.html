@@ -13,7 +13,7 @@
     }
     body {
       background-color: #121212;
-      background-image: radial-gradient(circle at 50% 40%, #1c1c1c 0%, #0d0d0d 100%);
+      background-image: radial-gradient(circle at 50% 40%, #1e1e1e 0%, #0d0d0d 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -26,28 +26,11 @@
 
     .flip-container {
       width: 100%;
-      max-width: 1400px;
+      max-width: 1200px;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px 15px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Envoltura para zoom interactivo */
-    #zoomWrapper {
-      transform-origin: center center;
-      transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    #zoomWrapper.zoomed {
-      cursor: grab;
-    }
-    #zoomWrapper.zoomed:active {
-      cursor: grabbing;
     }
 
     #book {
@@ -57,10 +40,9 @@
       transition: box-shadow 0.3s ease;
     }
 
-    /* Volumen lateral y canto de páginas cuando el libro está abierto */
     #book.is-open {
       box-shadow: 
-        0 25px 50px rgba(0, 0, 0, 0.75),
+        0 25px 50px rgba(0, 0, 0, 0.7),
         -6px 0 0 -2px #e5e5e5,
         -7px 0 0 -2px #999999,
         -12px 2px 10px rgba(0, 0, 0, 0.4),
@@ -69,7 +51,6 @@
         12px 2px 10px rgba(0, 0, 0, 0.4);
     }
 
-    /* Cada página individual */
     .page {
       background-color: #ffffff;
       overflow: hidden;
@@ -85,7 +66,7 @@
       pointer-events: none;
     }
 
-    /* Sombra del pliegue / lomo central en páginas interiores */
+    /* Pliegue central sutil */
     .page.--left:not(:first-child):not(:last-child)::after {
       content: "";
       position: absolute;
@@ -114,18 +95,11 @@
     .controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 14px;
       margin-top: 15px;
       margin-bottom: 20px;
       align-items: center;
       justify-content: center;
-      z-index: 10;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 6px;
-      align-items: center;
     }
 
     .btn {
@@ -150,15 +124,11 @@
     .btn:active {
       transform: translateY(0);
     }
-    .btn-icon {
-      padding: 9px 14px;
-      font-size: 16px;
-    }
 
     .page-info {
       color: #cccccc;
       font-size: 15px;
-      min-width: 140px;
+      min-width: 130px;
       text-align: center;
       letter-spacing: 0.3px;
     }
@@ -167,31 +137,19 @@
 <body>
 
   <div class="flip-container">
-    <div id="zoomWrapper">
-      <div id="book"></div>
-    </div>
+    <div id="book"></div>
   </div>
 
   <div class="controls">
-    <div class="btn-group">
-      <button class="btn" id="prevBtn" title="Flecha izquierda (←)">← Anterior</button>
-      <span class="page-info" id="pageNumber">Portada</span>
-      <button class="btn" id="nextBtn" title="Flecha derecha (→)">Siguiente →</button>
-    </div>
-
-    <div class="btn-group">
-      <button class="btn btn-icon" id="zoomOutBtn" title="Alejar zoom">−</button>
-      <button class="btn btn-icon" id="zoomResetBtn" title="Restablecer zoom">100%</button>
-      <button class="btn btn-icon" id="zoomInBtn" title="Acercar zoom">+</button>
-    </div>
-
+    <button class="btn" id="prevBtn" title="Flecha izquierda (←)">← Anterior</button>
+    <span class="page-info" id="pageNumber">Portada</span>
+    <button class="btn" id="nextBtn" title="Flecha derecha (→)">Siguiente →</button>
     <button class="btn" id="fullscreenBtn">⛶ Pantalla completa</button>
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const bookElement = document.getElementById('book');
-      const zoomWrapper = document.getElementById('zoomWrapper');
       
       const imageFiles = [
         'Page_0.jpg',
@@ -203,41 +161,34 @@
 
       const TOTAL_PAGES = imageFiles.length;
 
-      // Generar páginas con tapas duras en extremos
+      // Inyección limpia de páginas
       imageFiles.forEach((file, index) => {
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
 
-        // Tapa dura para la portada y contraportada
-        if (index === 0 || index === TOTAL_PAGES - 1) {
-          pageDiv.setAttribute('data-density', 'hard');
-        } else {
-          pageDiv.setAttribute('data-density', 'soft');
-        }
-
         const img = document.createElement('img');
         img.src = file;
         img.alt = `Página ${index + 1}`;
-        pageDiv.appendChild(img);
 
+        pageDiv.appendChild(img);
         bookElement.appendChild(pageDiv);
       });
 
-      // Configuración estricta para pliego doble (dos páginas enfrentadas)
+      // Configuración estable y garantizada
       const pageFlip = new St.PageFlip(bookElement, {
-        width: 500,           // Proporción A4 exacta
+        width: 500,
         height: 707,
         size: 'stretch',
-        minWidth: 320,
-        maxWidth: 1200,
-        minHeight: 450,
-        maxHeight: 1697,
-        maxShadowOpacity: 0.5,
-        showCover: true,      // Portada y contraportada solas
-        usePortrait: false,   // OBLIGA a mantener SIEMPRE dos páginas enfrentadas en el interior
+        minWidth: 310,
+        maxWidth: 1100,
+        minHeight: 438,
+        maxHeight: 1555,
+        maxShadowOpacity: 0.7,
+        showCover: true,
         drawShadow: true,
-        flippingTime: 650,
-        mobileScrollSupport: false
+        usePortrait: false,
+        mobileScrollSupport: false,
+        flippingTime: 700
       });
 
       pageFlip.loadFromHTML(document.querySelectorAll('.page'));
@@ -249,6 +200,12 @@
 
       prevBtn.addEventListener('click', () => pageFlip.flipPrev());
       nextBtn.addEventListener('click', () => pageFlip.flipNext());
+
+      // Flechas del teclado
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') pageFlip.flipNext();
+        if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+      });
 
       pageFlip.on('flip', (e) => {
         const current = e.data;
@@ -264,87 +221,23 @@
         }
       });
 
-      // 1. Navegación por teclado (Flechas)
-      window.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') pageFlip.flipNext();
-        if (e.key === 'ArrowLeft') pageFlip.flipPrev();
-      });
-
-      // 2. Control de Zoom y Pan (Arrastre)
-      let currentZoom = 1;
-      let panX = 0;
-      let panY = 0;
-      let isDragging = false;
-      let startX = 0;
-      let startY = 0;
-
-      const updateTransform = () => {
-        zoomWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
-        document.getElementById('zoomResetBtn').textContent = `${Math.round(currentZoom * 100)}%`;
-        if (currentZoom > 1) {
-          zoomWrapper.classList.add('zoomed');
-        } else {
-          zoomWrapper.classList.remove('zoomed');
-          panX = 0;
-          panY = 0;
-          zoomWrapper.style.transform = `translate(0px, 0px) scale(1)`;
-        }
-      };
-
-      document.getElementById('zoomInBtn').addEventListener('click', () => {
-        if (currentZoom < 2.2) {
-          currentZoom = Math.min(2.2, +(currentZoom + 0.2).toFixed(2));
-          updateTransform();
-        }
-      });
-
-      document.getElementById('zoomOutBtn').addEventListener('click', () => {
-        if (currentZoom > 0.8) {
-          currentZoom = Math.max(0.8, +(currentZoom - 0.2).toFixed(2));
-          updateTransform();
-        }
-      });
-
-      document.getElementById('zoomResetBtn').addEventListener('click', () => {
-        currentZoom = 1;
-        panX = 0;
-        panY = 0;
-        updateTransform();
-      });
-
-      zoomWrapper.addEventListener('mousedown', (e) => {
-        if (currentZoom <= 1) return;
-        isDragging = true;
-        startX = e.clientX - panX;
-        startY = e.clientY - panY;
-        zoomWrapper.style.transition = 'none';
-      });
-
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        panX = e.clientX - startX;
-        panY = e.clientY - startY;
-        zoomWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
-      });
-
-      window.addEventListener('mouseup', () => {
-        if (isDragging) {
-          isDragging = false;
-          zoomWrapper.style.transition = 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
-        }
-      });
-
-      // 3. Pantalla completa
+      // Pantalla completa
       fullscreenBtn.addEventListener('click', () => {
         if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => console.warn(err));
+          document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Error al activar pantalla completa: ${err.message}`);
+          });
         } else {
           document.exitFullscreen();
         }
       });
 
       document.addEventListener('fullscreenchange', () => {
-        fullscreenBtn.textContent = document.fullscreenElement ? '✕ Salir de pantalla completa' : '⛶ Pantalla completa';
+        if (document.fullscreenElement) {
+          fullscreenBtn.textContent = '✕ Salir de pantalla completa';
+        } else {
+          fullscreenBtn.textContent = '⛶ Pantalla completa';
+        }
       });
     });
   </script>
