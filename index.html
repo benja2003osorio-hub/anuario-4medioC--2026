@@ -90,16 +90,67 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const TOTAL_PAGES = 36;
       const bookElement = document.getElementById('book');
+      
+      // Lista con los nombres exactos de tus 34 archivos
+      const imageFiles = [
+        'Page_0.jpg',
+        ...Array.from({ length: 33 }, (_, i) => `Page_${String(i + 1).padStart(2, '0')}.jpg`)
+      ];
 
-      // Generación automática de las 36 páginas
-      for (let i = 1; i <= TOTAL_PAGES; i++) {
+      const TOTAL_PAGES = imageFiles.length;
+
+      // Crear cada página en el libro
+      imageFiles.forEach((file, index) => {
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
 
         const img = document.createElement('img');
-        img.src = `paginas/page-${i}.jpg`;
-        img.alt = `Página ${i}`;
+        img.src = file; // Ruta directa en la misma carpeta
+        img.alt = `Página ${index + 1}`;
         
-        // Carga inmediata de las primeras páginas, lazy loading para las siguientes
+        if (index > 3) {
+          img.loading = 'lazy';
+        }
+
+        pageDiv.appendChild(img);
+        bookElement.appendChild(pageDiv);
+      });
+
+      // Inicialización de PageFlip
+      const pageFlip = new St.PageFlip(bookElement, {
+        width: 550,
+        height: 733,
+        size: 'stretch',
+        minWidth: 315,
+        maxWidth: 1000,
+        minHeight: 420,
+        maxHeight: 1350,
+        maxShadowOpacity: 0.5,
+        showCover: true,
+        mobileScrollSupport: false
+      });
+
+      pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const pageInfo = document.getElementById('pageNumber');
+
+      prevBtn.addEventListener('click', () => pageFlip.flipPrev());
+      nextBtn.addEventListener('click', () => pageFlip.flipNext());
+
+      pageFlip.on('flip', (e) => {
+        const current = e.data;
+        if (current === 0) {
+          pageInfo.textContent = 'Portada';
+        } else if (current >= TOTAL_PAGES - 1) {
+          pageInfo.textContent = 'Contraportada';
+        } else {
+          pageInfo.textContent = `Páginas ${current} - ${current + 1} de ${TOTAL_PAGES}`;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
