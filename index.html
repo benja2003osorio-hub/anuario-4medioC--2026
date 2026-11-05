@@ -38,7 +38,6 @@
       border-radius: 2px;
       box-shadow: 0 15px 35px rgba(0, 0, 0, 0.55);
       transition: box-shadow 0.3s ease;
-      transform: translateZ(0); /* Aceleración por GPU */
     }
 
     #book.is-open {
@@ -52,52 +51,7 @@
         12px 2px 10px rgba(0, 0, 0, 0.4);
     }
 
-    .page {
-      background-color: #ffffff;
-      overflow: hidden;
-      position: relative;
-      /* Evita que se transparenten o muestren la página contraria al rotar */
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
-      transform: translate3d(0, 0, 0);
-    }
-
-    .page img {
-      width: 100%;
-      height: 100%;
-      object-fit: fill;
-      display: block;
-      user-select: none;
-      pointer-events: none;
-      -webkit-user-drag: none;
-    }
-
-    /* Sombras de lomo central para páginas interiores */
-    .page.--left:not(:first-child):not(:last-child)::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 32px;
-      height: 100%;
-      background: linear-gradient(to left, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.05) 60%, transparent 100%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .page.--right:not(:first-child):not(:last-child)::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 32px;
-      height: 100%;
-      background: linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.05) 60%, transparent 100%);
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    /* Controles */
+    /* Barra de controles */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -165,22 +119,7 @@
 
       const TOTAL_PAGES = imageFiles.length;
 
-      // Inyección en el DOM
-      imageFiles.forEach((file, index) => {
-        const pageDiv = document.createElement('div');
-        pageDiv.className = 'page';
-
-        const img = document.createElement('img');
-        img.src = file;
-        img.alt = `Página ${index + 1}`;
-        // Obliga a que la imagen se decodifique completamente en memoria antes de pintarse
-        img.decoding = 'async';
-
-        pageDiv.appendChild(img);
-        bookElement.appendChild(pageDiv);
-      });
-
-      // Configuración calibrada de StPageFlip
+      // Inicialización nativa con motor de texturas directo
       const pageFlip = new St.PageFlip(bookElement, {
         width: 500,
         height: 707,
@@ -189,22 +128,17 @@
         maxWidth: 1100,
         minHeight: 438,
         maxHeight: 1555,
-        maxShadowOpacity: 0.6,
+        maxShadowOpacity: 0.5,
         showCover: true,
         drawShadow: true,
         usePortrait: true,
         mobileScrollSupport: false,
-        flippingTime: 700, // Tiempo fluido para que no se desfase el motor de render
-        startPage: 0
+        flippingTime: 650,
+        useMouseEvents: true
       });
 
-      pageFlip.loadFromHTML(document.querySelectorAll('.page'));
-
-      // Precarga agresiva de toda la secuencia en memoria caché
-      imageFiles.forEach(src => {
-        const pre = new Image();
-        pre.src = src;
-      });
+      // Carga directa de imágenes: elimina la intermediación del DOM que provocaba el desfase
+      pageFlip.loadFromImages(imageFiles);
 
       const prevBtn = document.getElementById('prevBtn');
       const nextBtn = document.getElementById('nextBtn');
