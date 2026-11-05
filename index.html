@@ -13,7 +13,6 @@
     }
     body {
       background-color: #121212;
-      /* Fondo con textura sutil de mesa de estudio */
       background-image: radial-gradient(circle at 50% 40%, #1e1e1e 0%, #0d0d0d 100%);
       display: flex;
       flex-direction: column;
@@ -30,14 +29,13 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 30px 15px;
+      padding: 20px 15px;
       position: relative;
     }
 
-    /* Simulación del lomo y grosor de hojas traseras */
+    /* Simulación de volumen y cantos de hojas */
     #book {
       position: relative;
-      /* Sombra ambiental profunda + sombras laterales escalonadas que simulan el canto de las hojas */
       box-shadow: 
         0 25px 50px rgba(0, 0, 0, 0.7),
         -6px 0 0 -2px #e5e5e5,
@@ -58,39 +56,37 @@
     .page img {
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: fill;
       display: block;
       user-select: none;
     }
 
-    /* Sombra del pliegue / lomo interior (gutter shadow) */
-    /* Página izquierda: sombra en su borde derecho */
+    /* Sombra del pliegue central */
     .page.--left::after {
       content: "";
       position: absolute;
       top: 0;
       right: 0;
-      width: 35px;
+      width: 32px;
       height: 100%;
       background: linear-gradient(to left, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%);
       pointer-events: none;
       z-index: 5;
     }
 
-    /* Página derecha: sombra en su borde izquierdo */
     .page.--right::after {
       content: "";
       position: absolute;
       top: 0;
       left: 0;
-      width: 35px;
+      width: 32px;
       height: 100%;
       background: linear-gradient(to right, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.08) 50%, transparent 100%);
       pointer-events: none;
       z-index: 5;
     }
 
-    /* Bisel exterior suave en el borde del papel */
+    /* Bisel exterior */
     .page.--left::before {
       content: "";
       position: absolute;
@@ -98,7 +94,7 @@
       left: 0;
       width: 10px;
       height: 100%;
-      background: linear-gradient(to right, rgba(0, 0, 0, 0.06), transparent);
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.05), transparent);
       pointer-events: none;
       z-index: 5;
     }
@@ -110,30 +106,35 @@
       right: 0;
       width: 10px;
       height: 100%;
-      background: linear-gradient(to left, rgba(0, 0, 0, 0.06), transparent);
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.05), transparent);
       pointer-events: none;
       z-index: 5;
     }
 
-    /* Controles de navegación */
+    /* Barra de controles */
     .controls {
       display: flex;
-      gap: 16px;
-      margin-top: 20px;
-      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 15px;
+      margin-bottom: 20px;
       align-items: center;
+      justify-content: center;
     }
     .btn {
       background-color: #ffffff18;
       color: #ffffff;
       border: 1px solid #ffffff35;
-      padding: 10px 22px;
+      padding: 9px 18px;
       border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
       font-weight: 500;
       backdrop-filter: blur(8px);
       transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     .btn:hover {
       background-color: #ffffff35;
@@ -161,13 +162,13 @@
     <button class="btn" id="prevBtn">← Anterior</button>
     <span class="page-info" id="pageNumber">Portada</span>
     <button class="btn" id="nextBtn">Siguiente →</button>
+    <button class="btn" id="fullscreenBtn">⛶ Pantalla completa</button>
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const bookElement = document.getElementById('book');
       
-      // Orden exacto de las 36 páginas
       const imageFiles = [
         'Page_0.jpg',
         'Page_0,5.jpg',
@@ -178,7 +179,7 @@
 
       const TOTAL_PAGES = imageFiles.length;
 
-      // Inyección dinámica de las páginas
+      // Inyección con prioridad de renderizado (sin lazy load bloqueante)
       imageFiles.forEach((file, index) => {
         const pageDiv = document.createElement('div');
         pageDiv.className = 'page';
@@ -187,24 +188,28 @@
         img.src = file;
         img.alt = `Página ${index + 1}`;
         
-        if (index > 3) {
-          img.loading = 'lazy';
+        // Las primeras 6 páginas se decodifican de inmediato en sincronía
+        if (index < 6) {
+          img.decoding = 'sync';
+          img.fetchPriority = 'high';
+        } else {
+          img.decoding = 'async';
         }
 
         pageDiv.appendChild(img);
         bookElement.appendChild(pageDiv);
       });
 
-      // Configuración de StPageFlip con sombras físicas realistas
+      // Configuración A4 a 300 ppp
       const pageFlip = new St.PageFlip(bookElement, {
-        width: 550,
-        height: 733,
+        width: 500,
+        height: 707,
         size: 'stretch',
-        minWidth: 315,
-        maxWidth: 1000,
-        minHeight: 420,
-        maxHeight: 1350,
-        maxShadowOpacity: 0.85,  // Sombras de curvatura dinámicas bien marcadas
+        minWidth: 310,
+        maxWidth: 1100,
+        minHeight: 438,
+        maxHeight: 1555,
+        maxShadowOpacity: 0.85,
         showCover: true,
         drawShadow: true,
         usePortrait: true,
@@ -213,9 +218,33 @@
 
       pageFlip.loadFromHTML(document.querySelectorAll('.page'));
 
+      // Precarga agresiva en segundo plano de las 36 imágenes
+      const preloadImagesInBackground = () => {
+        let cursor = 0;
+        const loadNextBatch = () => {
+          if (cursor >= imageFiles.length) return;
+          const preImg = new Image();
+          preImg.src = imageFiles[cursor];
+          preImg.onload = preImg.onerror = () => {
+            cursor++;
+            // Usa el tiempo ocioso del navegador para no congelar la animación
+            if ('requestIdleCallback' in window) {
+              requestIdleCallback(loadNextBatch, { timeout: 150 });
+            } else {
+              setTimeout(loadNextBatch, 40);
+            }
+          };
+        };
+        loadNextBatch();
+      };
+
+      // Inicia la precarga silenciosa en segundo plano apenas arranca el libro
+      preloadImagesInBackground();
+
       const prevBtn = document.getElementById('prevBtn');
       const nextBtn = document.getElementById('nextBtn');
       const pageInfo = document.getElementById('pageNumber');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
 
       prevBtn.addEventListener('click', () => pageFlip.flipPrev());
       nextBtn.addEventListener('click', () => pageFlip.flipNext());
@@ -228,6 +257,25 @@
           pageInfo.textContent = 'Contraportada';
         } else {
           pageInfo.textContent = `Páginas ${current} - ${current + 1} de ${TOTAL_PAGES}`;
+        }
+      });
+
+      // Pantalla completa
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Error al activar pantalla completa: ${err.message}`);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+          fullscreenBtn.textContent = '✕ Salir de pantalla completa';
+        } else {
+          fullscreenBtn.textContent = '⛶ Pantalla completa';
         }
       });
     });
