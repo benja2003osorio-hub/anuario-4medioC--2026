@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anuario Digital</title>
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -23,20 +24,24 @@
       user-select: none;
     }
 
-    .stage-container {
+    .flip-container {
       width: 100%;
-      max-width: 1300px;
+      max-width: 1400px;
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 25px 15px;
+      padding: 20px 15px;
+      position: relative;
       overflow: hidden;
     }
 
+    /* Envoltura para zoom interactivo */
     #zoomWrapper {
       transform-origin: center center;
       transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
-      cursor: default;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     #zoomWrapper.zoomed {
       cursor: grab;
@@ -45,29 +50,15 @@
       cursor: grabbing;
     }
 
-    /* Espacio 3D y libro físico */
-    .book-viewport {
-      perspective: 2400px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .book {
+    #book {
       position: relative;
-      width: 480px;
-      height: 679px; /* Proporción A4 exacta */
-      transform-style: preserve-3d;
-      transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
-      /* Al inicio la portada está centrada */
-      transform: translateX(0);
       border-radius: 2px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.55);
+      transition: box-shadow 0.3s ease;
     }
 
-    /* Cuando el libro está abierto en dos páginas, se desplaza a la derecha y gana volumen lateral */
-    .book.is-open {
-      transform: translateX(50%);
+    /* Volumen lateral y canto de páginas cuando el libro está abierto */
+    #book.is-open {
       box-shadow: 
         0 25px 50px rgba(0, 0, 0, 0.75),
         -6px 0 0 -2px #e5e5e5,
@@ -78,85 +69,48 @@
         12px 2px 10px rgba(0, 0, 0, 0.4);
     }
 
-    /* En la contraportada vuelve al centro */
-    .book.is-last {
-      transform: translateX(100%);
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-    }
-
-    /* Hojas individuales con aceleración por GPU */
-    .paper {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      transform-origin: left center;
-      transform-style: preserve-3d;
-      transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
-      will-change: transform;
-    }
-
-    .paper.flipped {
-      transform: rotateY(-180deg);
-    }
-
-    /* Caras frontal y trasera */
-    .front, .back {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+    /* Cada página individual */
+    .page {
       background-color: #ffffff;
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
       overflow: hidden;
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.02);
+      position: relative;
     }
 
-    .back {
-      transform: rotateY(180deg);
-    }
-
-    .front img, .back img {
+    .page img {
       width: 100%;
       height: 100%;
       object-fit: fill;
       display: block;
+      user-select: none;
       pointer-events: none;
     }
 
-    /* Pliegue / Sombra central realista en CSS puro */
-    .front::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 30px;
-      height: 100%;
-      background: linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.02) 60%, transparent 100%);
-      pointer-events: none;
-    }
-
-    .back::after {
+    /* Sombra del pliegue / lomo central en páginas interiores */
+    .page.--left:not(:first-child):not(:last-child)::after {
       content: "";
       position: absolute;
       top: 0;
       right: 0;
-      width: 30px;
+      width: 32px;
       height: 100%;
-      background: linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.02) 60%, transparent 100%);
+      background: linear-gradient(to left, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.05) 60%, transparent 100%);
       pointer-events: none;
+      z-index: 5;
     }
 
-    /* La portada y contraportada no llevan sombra interior */
-    .paper:first-child .front::after,
-    .paper:last-child .back::after {
-      display: none;
+    .page.--right:not(:first-child):not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 32px;
+      height: 100%;
+      background: linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.05) 60%, transparent 100%);
+      pointer-events: none;
+      z-index: 5;
     }
 
-    /* Controles de navegación */
+    /* Controles */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -212,11 +166,9 @@
 </head>
 <body>
 
-  <div class="stage-container">
+  <div class="flip-container">
     <div id="zoomWrapper">
-      <div class="book-viewport">
-        <div class="book" id="book"></div>
-      </div>
+      <div id="book"></div>
     </div>
   </div>
 
@@ -238,9 +190,163 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const book = document.getElementById('book');
+      const bookElement = document.getElementById('book');
       const zoomWrapper = document.getElementById('zoomWrapper');
       
       const imageFiles = [
         'Page_0.jpg',
         'Page_0,5.jpg',
+        ...Array.from({ length: 32 }, (_, i) => `Page_${String(i + 1).padStart(2, '0')}.jpg`),
+        'Page_32,5.jpg',
+        'Page_33.jpg'
+      ];
+
+      const TOTAL_PAGES = imageFiles.length;
+
+      // Generar páginas con tapas duras en extremos
+      imageFiles.forEach((file, index) => {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'page';
+
+        // Tapa dura para la portada y contraportada
+        if (index === 0 || index === TOTAL_PAGES - 1) {
+          pageDiv.setAttribute('data-density', 'hard');
+        } else {
+          pageDiv.setAttribute('data-density', 'soft');
+        }
+
+        const img = document.createElement('img');
+        img.src = file;
+        img.alt = `Página ${index + 1}`;
+        pageDiv.appendChild(img);
+
+        bookElement.appendChild(pageDiv);
+      });
+
+      // Configuración estricta para pliego doble (dos páginas enfrentadas)
+      const pageFlip = new St.PageFlip(bookElement, {
+        width: 500,           // Proporción A4 exacta
+        height: 707,
+        size: 'stretch',
+        minWidth: 320,
+        maxWidth: 1200,
+        minHeight: 450,
+        maxHeight: 1697,
+        maxShadowOpacity: 0.5,
+        showCover: true,      // Portada y contraportada solas
+        usePortrait: false,   // OBLIGA a mantener SIEMPRE dos páginas enfrentadas en el interior
+        drawShadow: true,
+        flippingTime: 650,
+        mobileScrollSupport: false
+      });
+
+      pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const pageInfo = document.getElementById('pageNumber');
+      const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+      prevBtn.addEventListener('click', () => pageFlip.flipPrev());
+      nextBtn.addEventListener('click', () => pageFlip.flipNext());
+
+      pageFlip.on('flip', (e) => {
+        const current = e.data;
+        if (current === 0) {
+          pageInfo.textContent = 'Portada';
+          bookElement.classList.remove('is-open');
+        } else if (current >= TOTAL_PAGES - 1) {
+          pageInfo.textContent = 'Contraportada';
+          bookElement.classList.remove('is-open');
+        } else {
+          pageInfo.textContent = `Páginas ${current} - ${current + 1} de ${TOTAL_PAGES}`;
+          bookElement.classList.add('is-open');
+        }
+      });
+
+      // 1. Navegación por teclado (Flechas)
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') pageFlip.flipNext();
+        if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+      });
+
+      // 2. Control de Zoom y Pan (Arrastre)
+      let currentZoom = 1;
+      let panX = 0;
+      let panY = 0;
+      let isDragging = false;
+      let startX = 0;
+      let startY = 0;
+
+      const updateTransform = () => {
+        zoomWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+        document.getElementById('zoomResetBtn').textContent = `${Math.round(currentZoom * 100)}%`;
+        if (currentZoom > 1) {
+          zoomWrapper.classList.add('zoomed');
+        } else {
+          zoomWrapper.classList.remove('zoomed');
+          panX = 0;
+          panY = 0;
+          zoomWrapper.style.transform = `translate(0px, 0px) scale(1)`;
+        }
+      };
+
+      document.getElementById('zoomInBtn').addEventListener('click', () => {
+        if (currentZoom < 2.2) {
+          currentZoom = Math.min(2.2, +(currentZoom + 0.2).toFixed(2));
+          updateTransform();
+        }
+      });
+
+      document.getElementById('zoomOutBtn').addEventListener('click', () => {
+        if (currentZoom > 0.8) {
+          currentZoom = Math.max(0.8, +(currentZoom - 0.2).toFixed(2));
+          updateTransform();
+        }
+      });
+
+      document.getElementById('zoomResetBtn').addEventListener('click', () => {
+        currentZoom = 1;
+        panX = 0;
+        panY = 0;
+        updateTransform();
+      });
+
+      zoomWrapper.addEventListener('mousedown', (e) => {
+        if (currentZoom <= 1) return;
+        isDragging = true;
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+        zoomWrapper.style.transition = 'none';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        panX = e.clientX - startX;
+        panY = e.clientY - startY;
+        zoomWrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          zoomWrapper.style.transition = 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
+        }
+      });
+
+      // 3. Pantalla completa
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.warn(err));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      document.addEventListener('fullscreenchange', () => {
+        fullscreenBtn.textContent = document.fullscreenElement ? '✕ Salir de pantalla completa' : '⛶ Pantalla completa';
+      });
+    });
+  </script>
+</body>
+</html>
