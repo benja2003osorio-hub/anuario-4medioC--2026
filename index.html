@@ -4,34 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anuario Digital 4° Medio C</title>
+  <!-- Evita el error 404 de favicon.ico en la consola de GitHub Pages -->
+  <link rel="icon" href="data:,">
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+    html, body {
+      height: 100%;
+    }
     body {
       background-color: #121212;
       background-image: radial-gradient(circle at 50% 40%, #1f1f1f 0%, #0a0a0a 100%);
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+      height: 100vh;
+      height: 100dvh; /* en celulares descuenta la barra del navegador */
       font-family: system-ui, -apple-system, sans-serif;
       overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
     }
 
     /* Escenario principal */
     .viewport {
+      flex: 1 1 auto;
+      min-height: 0;
       width: 100%;
-      height: calc(100vh - 80px);
       display: flex;
       justify-content: center;
       align-items: center;
       overflow: hidden;
       position: relative;
+      touch-action: none; /* los gestos (pellizcar, arrastrar, deslizar) los maneja el script */
     }
 
     #zoomContainer {
@@ -50,12 +57,14 @@
 
     /* Contenedor del pliego abierto (2 páginas A4 juntas) */
     .book-scene {
-      /* Altura adaptable a la pantalla manteniendo proporción exacta de 2 A4 juntas (2 : 1.4142) */
+      /* El tamaño exacto lo calcula fitBook() en el script; esto es solo un valor de respaldo */
       height: min(82vh, 62vw);
       aspect-ratio: 2 / 1.4142;
+      flex: none;
       position: relative;
-      perspective: 2500px;
-      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      perspective: 4500px; /* se ajusta en fitBook(); más alto = giro más natural, menos deformado */
+      /* misma duración y curva que el giro de la hoja, para que el libro y la hoja se muevan a la par */
+      transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* Centrar cuando está cerrado en portada o contraportada */
@@ -66,25 +75,24 @@
       transform: translateX(25%);
     }
 
-    /* Sombra y canto de hojas cuando el libro está abierto */
+    /* Sombra única del libro y canto de hojas (una sola, en vez de una por hoja) */
     .book-spine-shadow {
       position: absolute;
       inset: 0;
       border-radius: 3px;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 0.4s ease;
-      box-shadow: 
-        0 25px 50px rgba(0, 0, 0, 0.75),
-        -5px 0 0 -1px #e5e5e5,
-        -6px 0 0 -1px #888888,
-        -10px 0 15px rgba(0, 0, 0, 0.45),
-        5px 0 0 -1px #e5e5e5,
-        6px 0 0 -1px #888888,
-        10px 0 15px rgba(0, 0, 0, 0.45);
+      transition: opacity 0.3s ease; /* al cerrar el libro desaparece de inmediato */
+      box-shadow:
+        0 22px 40px rgba(0, 0, 0, 0.6),
+        -4px 0 0 -1px #e5e5e5,
+        -5px 0 0 -1px #888888,
+        4px 0 0 -1px #e5e5e5,
+        5px 0 0 -1px #888888;
     }
     .book-scene.is-open .book-spine-shadow {
       opacity: 1;
+      transition-delay: 0.35s; /* aparece cuando la hoja ya casi aterrizó, sin dejar un hueco vacío */
     }
 
     /* Cada hoja física (ocupa la mitad derecha y rota hacia la mitad izquierda) */
@@ -99,12 +107,18 @@
       transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
     }
+    .sheet.turning {
+      will-change: transform; /* solo la hoja que gira usa aceleración extra */
+    }
+    .sheet.far {
+      visibility: hidden; /* hojas lejanas: no se dibujan, así sobra memoria y fluidez */
+    }
 
     .sheet.flipped {
       transform: rotateY(-180deg);
     }
 
-    /* Caras de cada hoja */
+    /* Caras de cada hoja (sin sombra propia: las sombras de 18 hojas se acumulaban en negro) */
     .face {
       position: absolute;
       inset: 0;
@@ -113,14 +127,10 @@
       background-color: #ffffff;
       -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
-      overflow: hidden;
-      border-radius: 0 2px 2px 0;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.35);
     }
 
     .face.back {
       transform: rotateY(180deg);
-      border-radius: 2px 0 0 2px;
     }
 
     .face img {
@@ -130,6 +140,59 @@
       display: block;
       pointer-events: none;
       -webkit-user-drag: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .face.ready img {
+      opacity: 1; /* la imagen aparece solo cuando ya está lista, sin parpadeos en blanco */
+    }
+
+    .face.loading::before {
+      content: "Cargando…";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #9a9a9a;
+    }
+
+    /* Si una imagen no se encuentra, se avisa con el nombre del archivo que falló */
+    .face.missing::before {
+      content: "No se encontró la imagen\A" attr(data-file);
+      white-space: pre-wrap;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      font-size: 14px;
+      color: #b00020;
+      background: #fafafa;
+    }
+
+    /* Sombreado que se oscurece mientras la hoja gira, para dar sensación de volumen */
+    .shade {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .face.front .shade {
+      background: linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 100%);
+    }
+    .face.back .shade {
+      background: linear-gradient(to left, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 100%);
+    }
+    .sheet.turning .shade {
+      animation: shade 0.7s ease-in-out;
+    }
+    @keyframes shade {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 0.55; }
     }
 
     /* Sombra del pliegue central (unión de las dos páginas) */
@@ -156,20 +219,28 @@
     }
 
     /* Quitar sombra central en portada y contraportada */
-    .sheet:first-of-type .face.front::after,
-    .sheet:last-of-type .face.back::after {
+    .sheet.is-cover .face.front::after,
+    .sheet.is-backcover .face.back::after {
       display: none;
+    }
+
+    /* Sombra suave solo en portada y contraportada (una sola, no una por hoja) */
+    .sheet.is-cover .face.front,
+    .sheet.is-backcover .face.back {
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
     }
 
     /* Barra de controles inferior */
     .controls {
-      height: 65px;
+      flex: none;
+      min-height: 65px;
       display: flex;
-      gap: 12px;
+      flex-wrap: wrap;
+      gap: 8px 12px;
       align-items: center;
       justify-content: center;
       z-index: 100;
-      padding: 0 15px;
+      padding: 8px 12px;
     }
 
     .btn-group {
@@ -179,7 +250,7 @@
     }
 
     .btn {
-      background-color: #ffffff18;
+      background-color: #ffffff1f;
       color: #ffffff;
       border: 1px solid #ffffff35;
       padding: 8px 16px;
@@ -187,11 +258,15 @@
       cursor: pointer;
       font-size: 14px;
       font-weight: 500;
-      backdrop-filter: blur(8px);
-      transition: all 0.2s ease;
+      white-space: nowrap;
+      transition: background-color 0.2s ease;
     }
     .btn:hover {
-      background-color: #ffffff35;
+      background-color: #ffffff38;
+    }
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: default;
     }
     .btn-icon {
       padding: 8px 13px;
@@ -204,11 +279,39 @@
       min-width: 145px;
       text-align: center;
     }
+
+    .hint {
+      display: none;
+      width: 100%;
+      text-align: center;
+      color: #9a9a9a;
+      font-size: 12px;
+    }
+
+    /* Celulares en vertical */
+    @media (max-width: 700px) and (orientation: portrait) {
+      .hint { display: block; }
+      .btn-group { flex-wrap: wrap; justify-content: center; }
+      .page-info { order: -1; flex-basis: 100%; min-width: 0; }
+      .btn { padding: 8px 12px; font-size: 13px; }
+    }
+
+    /* Celulares en horizontal (poca altura) */
+    @media (max-height: 500px) {
+      .controls { min-height: 48px; padding: 5px 10px; }
+      .btn { padding: 6px 12px; font-size: 13px; }
+    }
+
+    /* Personas que piden menos animaciones en su dispositivo */
+    @media (prefers-reduced-motion: reduce) {
+      .sheet, .book-scene { transition-duration: 0.01s; }
+      .sheet.turning .shade { animation: none; }
+    }
   </style>
 </head>
 <body>
 
-  <div class="viewport">
+  <div class="viewport" id="viewport">
     <div id="zoomContainer">
       <div class="book-scene closed-front" id="bookScene">
         <div class="book-spine-shadow"></div>
@@ -231,15 +334,23 @@
     </div>
 
     <button class="btn" id="fullscreenBtn">⛶ Pantalla completa</button>
+
+    <p class="hint">Gira el celular para verlo más grande · pellizca para hacer zoom · desliza para pasar de página</p>
   </div>
+
+  <noscript>Este anuario necesita JavaScript activado para mostrarse.</noscript>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const viewport = document.getElementById('viewport');
       const bookScene = document.getElementById('bookScene');
       const zoomContainer = document.getElementById('zoomContainer');
       const pageInfo = document.getElementById('pageNumber');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
 
-      // Tus 36 imágenes en orden exacto
+      // Tus 36 imágenes en orden exacto.
+      // OJO en GitHub Pages: los nombres deben coincidir EXACTAMENTE (mayúsculas, minúsculas y extensión).
       const imageFiles = [
         'Page_0.jpg',
         'Page_0,5.jpg',
@@ -248,60 +359,128 @@
         'Page_33.jpg'
       ];
 
-      const TOTAL_PAGES = imageFiles.length; // 36 páginas
-      const TOTAL_SHEETS = TOTAL_PAGES / 2;  // 18 hojas de papel (frente y dorso)
+      const TOTAL_PAGES = imageFiles.length;          // 36 páginas
+      const TOTAL_SHEETS = Math.ceil(TOTAL_PAGES / 2); // 18 hojas de papel (frente y dorso)
+      const FLIP_MS = 700;                             // duración del giro de una hoja (igual que en el CSS)
+      const PAGE_RATIO = 2 / 1.4142;                   // ancho / alto de dos páginas A4 juntas
+      const MAX_ZOOM = 3;
       const sheets = [];
 
-      // Crear las 18 hojas con frente y dorso
+      // ---------- Construcción del libro ----------
+      function createFace(className, file, pageNumber) {
+        const face = document.createElement('div');
+        face.className = 'face ' + className;
+        if (!file) return face;
+
+        face.classList.add('loading');
+        face.dataset.file = file;
+
+        const img = document.createElement('img');
+        img.alt = `Página ${pageNumber}`;
+        img.decoding = 'async';
+        img.draggable = false;
+        img.dataset.src = file; // se carga solo cuando la página está cerca (ver load)
+
+        img.addEventListener('load', () => {
+          // Se decodifica antes de mostrarla, para que el giro no se trabe al aparecer la imagen
+          const show = () => {
+            face.classList.remove('loading');
+            face.classList.add('ready');
+          };
+          if (img.decode) img.decode().then(show, show); else show();
+        });
+        img.addEventListener('error', () => {
+          face.classList.remove('loading');
+          face.classList.add('missing');
+          img.remove();
+          console.warn('No se pudo cargar la imagen:', file);
+        });
+
+        const shade = document.createElement('div');
+        shade.className = 'shade';
+
+        face.appendChild(img);
+        face.appendChild(shade);
+        return face;
+      }
+
       for (let i = 0; i < TOTAL_SHEETS; i++) {
         const sheet = document.createElement('div');
         sheet.className = 'sheet';
+        if (i === 0) sheet.classList.add('is-cover');
+        if (i === TOTAL_SHEETS - 1) sheet.classList.add('is-backcover');
 
-        const front = document.createElement('div');
-        front.className = 'face front';
-        const imgFront = document.createElement('img');
-        imgFront.src = imageFiles[i * 2];
-        imgFront.decoding = 'async';
-        front.appendChild(imgFront);
+        sheet.appendChild(createFace('front', imageFiles[i * 2], i * 2 + 1));
+        sheet.appendChild(createFace('back', imageFiles[i * 2 + 1], i * 2 + 2));
 
-        const back = document.createElement('div');
-        back.className = 'face back';
-        const imgBack = document.createElement('img');
-        imgBack.src = imageFiles[i * 2 + 1];
-        imgBack.decoding = 'async';
-        back.appendChild(imgBack);
-
-        sheet.appendChild(front);
-        sheet.appendChild(back);
-
-        // Hacer clic en la hoja derecha avanza, en la izquierda retrocede
+        // Clic en la hoja derecha avanza, en la izquierda retrocede
+        // (si el clic fue parte de un arrastre o deslizamiento, se ignora)
         sheet.addEventListener('click', () => {
-          if (sheet.classList.contains('flipped')) {
-            goPrev();
-          } else {
-            goNext();
-          }
+          if (gestureMoved) return;
+          turn(sheet.classList.contains('flipped') ? -1 : 1);
         });
 
         bookScene.appendChild(sheet);
         sheets.push(sheet);
       }
 
-      let currentSheet = 0; // 0 = Portada cerrada, 1..17 = Abierto, 18 = Contraportada
+      // Carga las imágenes de una hoja solo cuando se necesitan
+      const warmed = new Set();
+      function load(sheetIndex) {
+        const sheet = sheets[sheetIndex];
+        if (!sheet) return;
+        warmed.add(sheetIndex);
+        sheet.querySelectorAll('img[data-src]').forEach((img) => {
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+        });
+      }
 
-      function updateBookState() {
-        // Actualizar orden de capas (z-index) para que nunca se crucen ni se vean hojas de abajo
+      // Descarga en segundo plano el resto de las páginas (de una en una, sin decodificarlas),
+      // empezando por las más cercanas a la que se está leyendo. Así los giros siguientes salen de la caché.
+      let warming = false;
+      function warmCache() {
+        if (warming) return;
+        if (navigator.connection && navigator.connection.saveData) return; // respeta el ahorro de datos
+        let next = -1;
+        for (let i = 0; i < TOTAL_SHEETS; i++) {
+          if (warmed.has(i)) continue;
+          if (next === -1 || Math.abs(i - currentSheet) < Math.abs(next - currentSheet)) next = i;
+        }
+        if (next === -1) return;
+        warming = true;
+        warmed.add(next);
+        const urls = imageFiles.slice(next * 2, next * 2 + 2).filter(Boolean);
+        let pending = urls.length;
+        const done = () => {
+          if (--pending > 0) return;
+          warming = false;
+          setTimeout(warmCache, 200);
+        };
+        if (!pending) { warming = false; return; }
+        // Image() funciona igual abriendo el archivo directo o desde GitHub Pages, sin errores en la consola
+        urls.forEach((u) => {
+          const im = new Image();
+          im.onload = im.onerror = done;
+          im.src = u;
+        });
+      }
+      window.addEventListener('load', () => setTimeout(warmCache, 800));
+
+      // ---------- Estado y páginas ----------
+      let currentSheet = 0; // 0 = Portada cerrada, 1..17 = Abierto, 18 = Contraportada
+      let busy = false;     // evita pasar de página mientras una hoja está girando
+
+      function render() {
+        // Orden de capas (z-index) para que nunca se crucen ni se vean hojas de abajo
         sheets.forEach((sheet, index) => {
-          if (index < currentSheet) {
-            sheet.classList.add('flipped');
-            sheet.style.zIndex = index + 1;
-          } else {
-            sheet.classList.remove('flipped');
-            sheet.style.zIndex = TOTAL_SHEETS - index;
-          }
+          sheet.classList.toggle('flipped', index < currentSheet);
+          // Las hojas lejanas no se dibujan (mucho menos trabajo para el celular)
+          sheet.classList.toggle('far', index < currentSheet - 3 || index > currentSheet + 2);
+          sheet.style.zIndex = index < currentSheet ? index + 1 : TOTAL_SHEETS - index;
         });
 
-        // Actualizar posición del libro y texto
+        // Posición del libro y texto
         if (currentSheet === 0) {
           bookScene.className = 'book-scene closed-front';
           pageInfo.textContent = 'Portada';
@@ -314,98 +493,178 @@
           const rightPage = leftPage + 1;
           pageInfo.textContent = `Páginas ${leftPage} - ${rightPage} de ${TOTAL_PAGES}`;
         }
+
+        prevBtn.disabled = currentSheet === 0;
+        nextBtn.disabled = currentSheet === TOTAL_SHEETS;
+
+        // Carga solo las hojas cercanas (así el anuario abre rápido y no satura el celular)
+        for (let i = currentSheet - 2; i <= currentSheet + 3; i++) load(i);
       }
 
-      function goNext() {
-        if (currentSheet < TOTAL_SHEETS) {
-          // Elevar temporalmente la hoja que está girando por encima de todas
-          const turningSheet = sheets[currentSheet];
-          turningSheet.style.zIndex = 50;
-          currentSheet++;
-          updateBookState();
-          turningSheet.style.zIndex = 50;
-          setTimeout(() => updateBookState(), 700);
-        }
+      function turn(dir) {
+        if (busy) return;
+        const target = currentSheet + dir;
+        if (target < 0 || target > TOTAL_SHEETS) return;
+
+        busy = true;
+        const turning = sheets[dir > 0 ? currentSheet : target];
+        turning.classList.add('turning');
+        currentSheet = target;
+        render();
+        turning.style.zIndex = 100; // la hoja que gira va por encima de todas
+        setTimeout(() => {
+          turning.classList.remove('turning');
+          render();
+          busy = false;
+        }, FLIP_MS + 30);
       }
 
-      function goPrev() {
-        if (currentSheet > 0) {
-          currentSheet--;
-          const turningSheet = sheets[currentSheet];
-          updateBookState();
-          turningSheet.style.zIndex = 50;
-          setTimeout(() => updateBookState(), 700);
-        }
+      // Tamaño del libro según el espacio disponible (deja margen para la sombra y la perspectiva del giro)
+      function fitBook() {
+        const w = viewport.clientWidth;
+        const h = viewport.clientHeight;
+        const height = Math.max(100, Math.min(h * 0.88, (w * 0.94) / PAGE_RATIO));
+        bookScene.style.height = `${height}px`;
+        // La perspectiva crece con el libro, así el giro se ve igual de natural en pantallas chicas y grandes
+        bookScene.style.perspective = `${Math.round(height * 7)}px`;
       }
 
-      updateBookState();
+      fitBook();
+      render();
+      window.addEventListener('resize', fitBook);
+      window.addEventListener('orientationchange', () => setTimeout(fitBook, 200));
+      window.addEventListener('load', fitBook);
 
-      // Botones y teclado
-      document.getElementById('prevBtn').addEventListener('click', goPrev);
-      document.getElementById('nextBtn').addEventListener('click', goNext);
+      // ---------- Botones y teclado ----------
+      prevBtn.addEventListener('click', () => turn(-1));
+      nextBtn.addEventListener('click', () => turn(1));
 
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') goNext();
-        if (e.key === 'ArrowLeft') goPrev();
+        if (e.key === 'ArrowRight') turn(1);
+        if (e.key === 'ArrowLeft') turn(-1);
       });
 
-      // Zoom y arrastre (Pan)
-      let zoom = 1, panX = 0, panY = 0, isDragging = false, startX = 0, startY = 0;
+      // ---------- Zoom, arrastre y deslizar (mouse y pantalla táctil) ----------
+      let zoom = 1, panX = 0, panY = 0;
+      let gestureMoved = false;
+      let swipeStart = null;
+      let pinchStart = null;
+      const pointers = new Map();
       const zoomResetBtn = document.getElementById('zoomResetBtn');
 
-      function applyZoom() {
-        if (zoom <= 1) {
-          zoom = 1; panX = 0; panY = 0;
-          zoomContainer.classList.remove('zoomed');
-        } else {
-          zoomContainer.classList.add('zoomed');
-        }
+      function applyZoom(animate = true) {
+        zoom = Math.min(MAX_ZOOM, Math.max(1, zoom));
+        if (zoom === 1) { panX = 0; panY = 0; }
+
+        // El libro no puede salirse de la pantalla al arrastrarlo
+        const maxX = ((zoom - 1) * viewport.clientWidth) / 2;
+        const maxY = ((zoom - 1) * viewport.clientHeight) / 2;
+        panX = Math.min(maxX, Math.max(-maxX, panX));
+        panY = Math.min(maxY, Math.max(-maxY, panY));
+
+        zoomContainer.style.transition = animate ? '' : 'none';
+        zoomContainer.classList.toggle('zoomed', zoom > 1);
         zoomContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
         zoomResetBtn.textContent = `${Math.round(zoom * 100)}%`;
       }
 
       document.getElementById('zoomInBtn').addEventListener('click', () => {
-        if (zoom < 2.5) { zoom = +(zoom + 0.25).toFixed(2); applyZoom(); }
+        zoom = +(zoom + 0.25).toFixed(2);
+        applyZoom();
       });
       document.getElementById('zoomOutBtn').addEventListener('click', () => {
-        if (zoom > 1) { zoom = +(zoom - 0.25).toFixed(2); applyZoom(); }
+        zoom = +(zoom - 0.25).toFixed(2);
+        applyZoom();
       });
       zoomResetBtn.addEventListener('click', () => {
-        zoom = 1; applyZoom();
+        zoom = 1;
+        applyZoom();
       });
 
-      zoomContainer.addEventListener('mousedown', (e) => {
-        if (zoom <= 1) return;
-        isDragging = true;
-        startX = e.clientX - panX;
-        startY = e.clientY - panY;
-        zoomContainer.style.transition = 'none';
-      });
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        panX = e.clientX - startX;
-        panY = e.clientY - startY;
-        zoomContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-      });
-      window.addEventListener('mouseup', () => {
-        if (isDragging) {
-          isDragging = false;
-          zoomContainer.style.transition = 'transform 0.2s ease-out';
+      viewport.addEventListener('pointerdown', (e) => {
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointers.size === 1) {
+          gestureMoved = false;
+          swipeStart = { x: e.clientX, y: e.clientY, panX, panY };
+        } else if (pointers.size === 2) {
+          gestureMoved = true;
+          const [a, b] = [...pointers.values()];
+          pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom };
         }
       });
 
-      // Pantalla completa
+      window.addEventListener('pointermove', (e) => {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // Pellizcar con dos dedos para acercar o alejar
+        if (pointers.size === 2 && pinchStart) {
+          const [a, b] = [...pointers.values()];
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          zoom = pinchStart.zoom * (dist / pinchStart.dist);
+          applyZoom(false);
+          return;
+        }
+
+        // Un dedo o el mouse: mover el libro si hay zoom
+        if (pointers.size === 1 && swipeStart) {
+          const dx = e.clientX - swipeStart.x;
+          const dy = e.clientY - swipeStart.y;
+          if (Math.hypot(dx, dy) > 6) gestureMoved = true;
+          if (zoom > 1 && gestureMoved) {
+            panX = swipeStart.panX + dx;
+            panY = swipeStart.panY + dy;
+            applyZoom(false);
+          }
+        }
+      });
+
+      function endPointer(e) {
+        if (!pointers.has(e.pointerId)) return;
+        pointers.delete(e.pointerId);
+
+        if (pinchStart && pointers.size < 2) {
+          pinchStart = null;
+          swipeStart = null; // el dedo que queda no debe mover ni pasar página
+        }
+
+        if (pointers.size === 0) {
+          // Deslizar horizontalmente (sin zoom) pasa de página
+          if (swipeStart && zoom === 1 && e.type === 'pointerup') {
+            const dx = e.clientX - swipeStart.x;
+            const dy = e.clientY - swipeStart.y;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+              turn(dx < 0 ? 1 : -1);
+            }
+          }
+          swipeStart = null;
+          applyZoom();
+        }
+      }
+      window.addEventListener('pointerup', endPointer);
+      window.addEventListener('pointercancel', endPointer);
+
+      // ---------- Pantalla completa (no existe en iPhone, ahí se oculta el botón) ----------
       const fullscreenBtn = document.getElementById('fullscreenBtn');
-      fullscreenBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-        } else {
-          document.exitFullscreen();
-        }
-      });
-      document.addEventListener('fullscreenchange', () => {
-        fullscreenBtn.textContent = document.fullscreenElement ? '✕ Salir' : '⛶ Pantalla completa';
-      });
+      const root = document.documentElement;
+      const requestFS = root.requestFullscreen || root.webkitRequestFullscreen;
+      const exitFS = document.exitFullscreen || document.webkitExitFullscreen;
+      const currentFS = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+      if (!requestFS) {
+        fullscreenBtn.style.display = 'none';
+      } else {
+        fullscreenBtn.addEventListener('click', () => {
+          const result = currentFS() ? exitFS.call(document) : requestFS.call(root);
+          if (result && result.catch) result.catch(() => {});
+        });
+        const onFullscreenChange = () => {
+          fullscreenBtn.textContent = currentFS() ? '✕ Salir' : '⛶ Pantalla completa';
+          fitBook();
+        };
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+      }
     });
   </script>
 </body>
